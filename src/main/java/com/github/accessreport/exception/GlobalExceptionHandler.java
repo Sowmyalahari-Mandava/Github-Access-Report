@@ -17,25 +17,37 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // Handles: organization name not found on GitHub
+    /**
+     * Handles cases where the GitHub organization is not found.
+     * @return 404 NOT FOUND response
+     */
     @ExceptionHandler(OrganizationNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleOrgNotFound(OrganizationNotFoundException ex) {
         return buildErrorResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
-    // Handles: bad or missing GitHub token
+    /**
+     * Handles GitHub authentication failures (invalid or missing token).
+     * @return 401 UNAUTHORIZED response
+     */
     @ExceptionHandler(GitHubAuthException.class)
     public ResponseEntity<Map<String, Object>> handleAuthError(GitHubAuthException ex) {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
     }
 
-    // Handles: too many requests to GitHub API
+    /**
+     * Handles GitHub API rate limit exceeded errors.
+     * @return 429 TOO MANY REQUESTS response
+     */
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<Map<String, Object>> handleRateLimit(RateLimitExceededException ex) {
         return buildErrorResponse(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
     }
 
-    // Handles: no internet / GitHub server is down
+    /**
+     * Handles connectivity issues such as no internet or GitHub server downtime.
+     * @return 503 SERVICE UNAVAILABLE response
+     */
     @ExceptionHandler(ResourceAccessException.class)
     public ResponseEntity<Map<String, Object>> handleConnectionError(ResourceAccessException ex) {
         return buildErrorResponse(
@@ -44,7 +56,10 @@ public class GlobalExceptionHandler {
         );
     }
 
-    // Handles: anything else we didn't predict
+    /**
+     * Handles all other unexpected exceptions.
+     * @return 500 INTERNAL SERVER ERROR response
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericError(Exception ex) {
         return buildErrorResponse(
@@ -53,7 +68,10 @@ public class GlobalExceptionHandler {
         );
     }
 
-    // Helper method to build a consistent error response body
+    /**
+     * Builds a consistent error response body.
+     * @return ResponseEntity containing structured error response
+     */
     private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String message) {
         Map<String, Object> errorBody = new HashMap<>();
         errorBody.put("status", status.value());

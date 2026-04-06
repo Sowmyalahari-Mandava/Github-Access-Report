@@ -19,6 +19,17 @@ public class AccessReportController {
 
     private final GitHubService gitHubService;
 
+    /**
+     * Endpoint to fetch access report for a given GitHub organization.
+     *
+     * Example API:
+     * GET /api/github/org/{orgName}/access-report
+     * Example:
+     * GET /api/github/org/spring-projects/access-report
+     *
+     * @param orgName Name of the GitHub organization
+     * @return ResponseEntity containing AccessReportResponse
+     */
     @GetMapping(ApiConstants.ACCESS_REPORT_PATH)
     public ResponseEntity<AccessReportResponse> getAccessReport(
             @PathVariable String orgName) {

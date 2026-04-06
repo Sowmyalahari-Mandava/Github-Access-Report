@@ -4,8 +4,8 @@ import com.github.accessreport.dto.AccessReportResponse;
 import com.github.accessreport.exception.GitHubAuthException;
 import com.github.accessreport.exception.OrganizationNotFoundException;
 import com.github.accessreport.exception.RateLimitExceededException;
-import com.github.accessreport.model.GitHubContributor;
-import com.github.accessreport.model.GitHubRepository;
+import com.github.accessreport.model.GitHubContributorResponse;
+import com.github.accessreport.model.GitHubRepositoryResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,37 +32,30 @@ public class GitHubService {
      */
     public AccessReportResponse getAccessReport(String orgName) {
 
-        // Step 1: Get all repositories of the org
-        List<GitHubRepository> repos = getRepositories(orgName);
+        List<GitHubRepositoryResponse> repos = getRepositories(orgName);
 
-        // Step 2: Map each user to the repos they contributed to
-        // Key = username, Value = list of repo names
         Map<String, List<String>> userToRepos = new HashMap<>();
 
-        for (GitHubRepository repo : repos) {
-            List<GitHubContributor> contributors = getContributors(orgName, repo.getName());
+        for (GitHubRepositoryResponse repo : repos) {
+            List<GitHubContributorResponse> contributors = getContributors(orgName, repo.getName());
 
-            for (GitHubContributor contributor : contributors) {
-                // Skip bots, only include real users
+            for (GitHubContributorResponse contributor : contributors) {
                 if ("Bot".equalsIgnoreCase(contributor.getType())) {
                     continue;
                 }
 
-                // Add this repo to the user's list
                 userToRepos
                     .computeIfAbsent(contributor.getLogin(), k -> new ArrayList<>())
                     .add(repo.getName());
             }
         }
 
-        // Step 3: Convert the map to a list of UserAccess objects
         List<AccessReportResponse.UserAccess> userAccessList = new ArrayList<>();
 
         for (Map.Entry<String, List<String>> entry : userToRepos.entrySet()) {
             userAccessList.add(new AccessReportResponse.UserAccess(entry.getKey(), entry.getValue()));
         }
 
-        // Sort by username so output is consistent
         userAccessList.sort(Comparator.comparing(AccessReportResponse.UserAccess::getUsername));
 
         return new AccessReportResponse(orgName, userAccessList);
@@ -72,24 +65,22 @@ public class GitHubService {
      * Fetches all repositories for the given organization.
      * Uses pagination (100 per page) to handle orgs with many repos.
      */
-    private List<GitHubRepository> getRepositories(String orgName) {
-        List<GitHubRepository> allRepos = new ArrayList<>();
+    private List<GitHubRepositoryResponse> getRepositories(String orgName) {
+        List<GitHubRepositoryResponse> allRepos = new ArrayList<>();
         int page = 1;
 
         while (true) {
             String url = GITHUB_API + "/orgs/" + orgName + "/repos?per_page=100&page=" + page;
 
             try {
-                GitHubRepository[] pageResult = restTemplate.getForObject(url, GitHubRepository[].class);
+                GitHubRepositoryResponse[] pageResult = restTemplate.getForObject(url, GitHubRepositoryResponse[].class);
 
-                // If page is empty or null, we've fetched everything
                 if (pageResult == null || pageResult.length == 0) {
                     break;
                 }
 
                 allRepos.addAll(Arrays.asList(pageResult));
 
-                // If we got less than 100, this was the last page
                 if (pageResult.length < 100) {
                     break;
                 }
@@ -109,8 +100,8 @@ public class GitHubService {
      * Fetches all contributors for a single repository.
      * Uses pagination to handle repos with many contributors.
      */
-    private List<GitHubContributor> getContributors(String orgName, String repoName) {
-        List<GitHubContributor> allContributors = new ArrayList<>();
+    private List<GitHubContributorResponse> getContributors(String orgName, String repoName) {
+        List<GitHubContributorResponse> allContributors = new ArrayList<>();
         int page = 1;
 
         while (true) {
@@ -118,7 +109,7 @@ public class GitHubService {
                     + "/contributors?per_page=100&page=" + page;
 
             try {
-                GitHubContributor[] pageResult = restTemplate.getForObject(url, GitHubContributor[].class);
+                GitHubContributorResponse[] pageResult = restTemplate.getForObject(url, GitHubContributorResponse[].class);
 
                 if (pageResult == null || pageResult.length == 0) {
                     break;
@@ -133,7 +124,6 @@ public class GitHubService {
                 page++;
 
             } catch (HttpClientErrorException.NotFound ex) {
-                // Repo may have been deleted — just skip it
                 log.warn("Repo {}/{} not found when fetching contributors. Skipping.", orgName, repoName);
                 break;
             } catch (HttpClientErrorException ex) {
@@ -160,7 +150,6 @@ public class GitHubService {
         } else if (statusCode == 429) {
             throw new RateLimitExceededException();
         } else {
-            // For anything else, just rethrow
             throw ex;
         }
     }
