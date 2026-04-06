@@ -1,6 +1,8 @@
 package com.github.accessreport.service;
 
+import com.github.accessreport.constants.ApiConstants;
 import com.github.accessreport.dto.AccessReportResponse;
+import com.github.accessreport.enums.GitHubApiPaths;
 import com.github.accessreport.exception.GitHubAuthException;
 import com.github.accessreport.exception.OrganizationNotFoundException;
 import com.github.accessreport.exception.RateLimitExceededException;
@@ -14,6 +16,16 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 
+/**
+ * Service class responsible for interacting with GitHub API
+ * and generating access reports for organizations.
+ *
+ * Responsibilities:
+ * 1. Fetch repositories of an organization
+ * 2. Fetch contributors of each repository
+ * 3. Aggregate and map users to their repositories
+ * 4. Handle API errors and convert them into custom exceptions
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -21,7 +33,8 @@ public class GitHubService {
 
     private final RestTemplate restTemplate;
 
-    private static final String GITHUB_API = "https://api.github.com";
+    private static final int PER_PAGE = 100;
+    private static final String BOT_TYPE = "Bot";
 
     /**
      * Main method - builds the full access report for an organization.
@@ -40,13 +53,13 @@ public class GitHubService {
             List<GitHubContributorResponse> contributors = getContributors(orgName, repo.getName());
 
             for (GitHubContributorResponse contributor : contributors) {
-                if ("Bot".equalsIgnoreCase(contributor.getType())) {
+                if (BOT_TYPE.equalsIgnoreCase(contributor.getType())) {
                     continue;
                 }
 
                 userToRepos
-                    .computeIfAbsent(contributor.getLogin(), k -> new ArrayList<>())
-                    .add(repo.getName());
+                        .computeIfAbsent(contributor.getLogin(), k -> new ArrayList<>())
+                        .add(repo.getName());
             }
         }
 
@@ -70,7 +83,9 @@ public class GitHubService {
         int page = 1;
 
         while (true) {
-            String url = GITHUB_API + "/orgs/" + orgName + "/repos?per_page=100&page=" + page;
+            String url = ApiConstants.BASE_URL +
+                    GitHubApiPaths.ORG_REPOS.getPath(orgName)
+                    + String.format(ApiConstants.QUERY_PARAMS, ApiConstants.PER_PAGE, page);
 
             try {
                 GitHubRepositoryResponse[] pageResult = restTemplate.getForObject(url, GitHubRepositoryResponse[].class);
@@ -81,7 +96,7 @@ public class GitHubService {
 
                 allRepos.addAll(Arrays.asList(pageResult));
 
-                if (pageResult.length < 100) {
+                if (pageResult.length < PER_PAGE) {
                     break;
                 }
 
@@ -92,7 +107,7 @@ public class GitHubService {
             }
         }
 
-        log.info("Fetched {} repositories for org: {}", allRepos.size(), orgName);
+        log.info(ApiConstants.REPO_FETCH_LOG, allRepos.size(), orgName);
         return allRepos;
     }
 
@@ -105,8 +120,9 @@ public class GitHubService {
         int page = 1;
 
         while (true) {
-            String url = GITHUB_API + "/repos/" + orgName + "/" + repoName
-                    + "/contributors?per_page=100&page=" + page;
+            String url = ApiConstants.BASE_URL +
+                    GitHubApiPaths.CONTRIBUTORS.getPath(orgName, repoName)
+                    + String.format(ApiConstants.QUERY_PARAMS, ApiConstants.PER_PAGE, page);
 
             try {
                 GitHubContributorResponse[] pageResult = restTemplate.getForObject(url, GitHubContributorResponse[].class);
@@ -117,14 +133,14 @@ public class GitHubService {
 
                 allContributors.addAll(Arrays.asList(pageResult));
 
-                if (pageResult.length < 100) {
+                if (pageResult.length < PER_PAGE) {
                     break;
                 }
 
                 page++;
 
             } catch (HttpClientErrorException.NotFound ex) {
-                log.warn("Repo {}/{} not found when fetching contributors. Skipping.", orgName, repoName);
+                log.warn(ApiConstants.CONTRIBUTORS_NOT_FOUND_LOG, orgName, repoName);
                 break;
             } catch (HttpClientErrorException ex) {
                 handleHttpError(ex, orgName);

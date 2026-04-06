@@ -1,5 +1,6 @@
 package com.github.accessreport.exception;
 
+import com.github.accessreport.constants.ApiConstants;
 import com.github.accessreport.constants.ExceptionConstants;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -74,10 +75,10 @@ public class GlobalExceptionHandler {
      */
     private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String message) {
         Map<String, Object> errorBody = new HashMap<>();
-        errorBody.put("status", status.value());
-        errorBody.put("error", status.getReasonPhrase());
-        errorBody.put("message", message);
-        errorBody.put("timestamp", LocalDateTime.now().toString());
+        errorBody.put(ApiConstants.STATUS, status.value());
+        errorBody.put(ApiConstants.ERROR, status.getReasonPhrase());
+        errorBody.put(ApiConstants.MESSAGE, message);
+        errorBody.put(ApiConstants.TIMESTAMP, LocalDateTime.now().toString());
 
         return ResponseEntity.status(status).body(errorBody);
     }

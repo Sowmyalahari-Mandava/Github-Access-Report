@@ -35,7 +35,6 @@ public class AppConfig {
     public RestTemplate restTemplate() {
         RestTemplate restTemplate = new RestTemplate();
 
-        // Add interceptor to include headers in every request
         restTemplate.setInterceptors(
                 Collections.singletonList(createAuthInterceptor())
         );
